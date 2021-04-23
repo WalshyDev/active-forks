@@ -19,7 +19,7 @@ function addDarkmodeWidget() {
   new Darkmode( { label: '🌓' } ).showWidget();
 }
 
-function fetchData() {
+function fetchData(maxPage = 1) {
   const repo = document.getElementById('q').value;
   const re = /[-_\w]+\/[-_.\w]+/;
 
@@ -30,7 +30,7 @@ function fetchData() {
   }
 
   if (re.test(repo)) {
-    fetchAndShow(repo);
+    fetchAndShow(repo, maxPage);
   } else {
     showMsg(
       'Invalid GitHub repository! Format is &lt;username&gt;/&lt;repo&gt;',
@@ -39,7 +39,7 @@ function fetchData() {
   }
 }
 
-function updateDT(data) {
+function updateDT(data, updating = true) {
   // Remove any alerts, if any:
   if ($('.alert')) $('.alert').remove();
 
@@ -53,9 +53,12 @@ function updateDT(data) {
   const dataSet = forks.map(fork =>
     window.columnNamesMap.map(colNM => fork[colNM[1]])
   );
-  window.forkTable
-    .clear()
-    .rows.add(dataSet)
+
+  if (!updating) {
+    window.forkTable.clear();
+  }
+
+  window.forkTable.rows.add(dataSet)
     .draw();
 }
 
@@ -108,20 +111,24 @@ function initDT() {
   table.searchBuilder.container().prependTo(table.table().container());
 }
 
-function fetchAndShow(repo) {
+function fetchAndShow(repo, maxPage = 1, page = 1) {
   repo = repo.replace('https://github.com/', '');
   repo = repo.replace('http://github.com/', '');
   repo = repo.replace(/\.git$/, '');
 
   fetch(
-    `https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`
+    `https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100&page=${page}`
   )
     .then(response => {
       if (!response.ok) throw Error(response.statusText);
       return response.json();
     })
     .then(data => {
-      updateDT(data);
+      updateDT(data, page > 1);
+
+      if (data.length === 100 && maxPage > page) {
+        fetchAndShow(repo, maxPage, page + 1);
+      }
     })
     .catch(error => {
       const msg =
